@@ -1,4 +1,4 @@
-module(name = "hedron_compile_commands")
+module(name = "hedron_compile_commands", version ="0.1")
 
 p = use_extension("//:workspace_setup.bzl", "hedron_compile_commands_extension")
 pt = use_extension("//:workspace_setup_transitive.bzl", "hedron_compile_commands_extension")
