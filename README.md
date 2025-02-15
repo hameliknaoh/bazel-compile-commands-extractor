@@ -1,4 +1,34 @@
-# Hedron's Compile Commands Extractor for Bazel — User Interface
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Compile Commands Extractor for Bazel](#compile-commands-extractor-for-bazel)
+  - [Quick Example](#quick-example)
+  - [Status](#status)
+    - [Outside Testimonials](#outside-testimonials)
+  - [Usage](#usage)
+    - [First, add this tool to your Bazel setup.](#first-add-this-tool-to-your-bazel-setup)
+      - [If you have a MODULE.bazel file and are using the new bzlmod system](#if-you-have-a-modulebazel-file-and-are-using-the-new-bzlmod-system)
+      - [If you're using the traditional WORKSPACE system](#if-youre-using-the-traditional-workspace-system)
+      - [Either way: Get Updates via Renovate](#either-way-get-updates-via-renovate)
+    - [Second, get the extractor running.](#second-get-the-extractor-running)
+      - [There are four common paths:](#there-are-four-common-paths)
+        - [1. Have a relatively simple codebase, where every target builds without needing any additional configuration or flags beyond what's in .bazelrc?](#1-have-a-relatively-simple-codebase-where-every-target-builds-without-needing-any-additional-configuration-or-flags-beyond-whats-in-bazelrc)
+        - [2. Are there Bazel flags, e.g., `--config=my_important_flags_or_toolchains --compilation_mode=dbg`, that you apply manually apply to all your builds while developing?](#2-are-there-bazel-flags-eg---configmy_important_flags_or_toolchains---compilation_modedbg-that-you-apply-manually-apply-to-all-your-builds-while-developing)
+        - [3. Often, though, you'll want to specify the top-level, output targets you care about and/or what flags they individually need. This avoids issues where some targets can't be built on their own; they need configuration on the command line or by a parent rule. An example of the latter is an android_library, which probably cannot be built independently of the android_binary that configures it.](#3-often-though-youll-want-to-specify-the-top-level-output-targets-you-care-about-andor-what-flags-they-individually-need-this-avoids-issues-where-some-targets-cant-be-built-on-their-own-they-need-configuration-on-the-command-line-or-by-a-parent-rule-an-example-of-the-latter-is-an-android_library-which-probably-cannot-be-built-independently-of-the-android_binary-that-configures-it)
+        - [4. Using `ccls` or another tool that, unlike `clangd`, doesn't want or need headers in `compile_commands.json`?](#4-using-ccls-or-another-tool-that-unlike-clangd-doesnt-want-or-need-headers-in-compile_commandsjson)
+    - [If you've got a very large project and `compile_commands.json` is taking a while to generate:](#if-youve-got-a-very-large-project-and-compile_commandsjson-is-taking-a-while-to-generate)
+  - [Editor Setup — for autocomplete based on `compile_commands.json`](#editor-setup--for-autocomplete-based-on-compile_commandsjson)
+    - [VSCode](#vscode)
+      - [If you work on your repository with others...](#if-you-work-on-your-repository-with-others)
+    - [Other Editors](#other-editors)
+  - ["Smooth Edges" — what we've enjoyed using this for](#smooth-edges--what-weve-enjoyed-using-this-for)
+    - [Here's what you should be expecting, based on our experience:](#heres-what-you-should-be-expecting-based-on-our-experience)
+  - [Rough Edges](#rough-edges)
+  - [Other Projects Likely Of Interest](#other-projects-likely-of-interest)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+# Compile Commands Extractor for Bazel
 
 **What is this project trying to do for me?**
 
@@ -6,13 +36,78 @@ First, provide Bazel users cross-platform autocomplete for the C language family
 
 More generally, export Bazel build actions into the `compile_commands.json` format that enables great tooling decoupled from Bazel.
 
-## Usage Visuals
+## Quick Example
 
-![Usage Animation](https://user-images.githubusercontent.com/7157583/142501309-862e89e2-02b4-4b61-950c-8b7e1bfd7eb7.gif)
+Let's extract the [`compile_commands.json` database](https://clang.llvm.org/docs/JSONCompilationDatabase.html) to enrich the C/C++ LSP server in your editor.
 
-▲ Extracts `compile_commands.json`, enabling [`clangd` autocomplete](https://github.com/clangd/vscode-clangd) in your editor ▼
+1. Update `MODULE.bazel`: Add `hedron_compile_commands` bazel module
 
-![clangd help example](https://user-images.githubusercontent.com/7157583/142502357-af9ba056-f9e0-47ce-b69d-57e85dcca458.png)
+```starlark
+# MODULE.bazel
+
+bazel_dep(name = "hedron_compile_commands", version="0.1")
+
+git_override(
+    module_name = "hedron_compile_commands",
+    remote = "https://github.com/hameliknaoh/bazel-compile-commands-extractor.git",
+    branch = "main",
+)
+```
+
+2. Update `BUILD` and add targets of interests e.g. `//:main`:
+
+```starlark
+load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
+
+refresh_compile_commands(
+    name = "refresh_compile_commands",
+
+    targets = {
+      "//:main":"",
+    },
+)
+
+# ...
+
+cc_binary(
+    name = "main",
+    srcs = ["main.cpp"],
+    # deps = [...],
+)
+```
+
+3. Build the target e.g. `main` target, and when successful, run `bazelisk run :refresh_compile_commands` to generate `compile_commands.json`:
+
+```bash
+# Build main target
+» bazelisk build //:main
+INFO: Analyzed target //:main (0 packages loaded, 2571 targets configured).
+INFO: Found 1 target...
+Target //:main up-to-date:
+  bazel-bin/main
+INFO: Elapsed time: 1.786s, Critical Path: 0.04s
+INFO: 1 process: 848 action cache hit, 1 internal.
+INFO: Build completed successfully, 1 total action
+
+# Generate compile_commands.json
+» bazelisk run :refresh_compile_commands
+INFO: Analyzed target //:refresh_compile_commands (0 packages loaded, 2369 targets configured).
+INFO: Found 1 target...
+Target //:refresh_compile_commands up-to-date:
+  bazel-bin/refresh_compile_commands
+  bazel-bin/refresh_compile_commands.check_python_version.py
+  bazel-bin/refresh_compile_commands.py
+INFO: Elapsed time: 0.556s, Critical Path: 0.02s
+INFO: 1 process: 9 action cache hit, 1 internal.
+INFO: Build completed successfully, 1 total action
+INFO: Running command line: bazel-bin/refresh_compile_commands
+>>> Analyzing commands used in //:main
+>>> Finished extracting commands for //:main
+
+# List compile_commands.json
+» ls -al compile_commands.json
+-rw-rw-r-- 1 test test 7719283 Feb 14 19:50 compile_commands.json
+```
 
 ## Status
 
@@ -29,10 +124,10 @@ There are lots of people using this tool. That includes large companies and proj
 We're including a couple of things they've said. We hope they'll give you enough confidence to give this tool a try, too!
 
 > "Thanks for an awesome tool! Super easy to set up and use."
-— a robotics engineer at Boston Dynamics
+> — a robotics engineer at Boston Dynamics
 
 > "Thank you for showing so much rigor in what would otherwise be just some uninteresting tooling project. This definitely feels like a passing the baton/torch moment. My best wishes for everything you do in life."
-— author of the previous best tool of this type
+> — author of the previous best tool of this type
 
 ## Usage
 
@@ -45,6 +140,7 @@ There's a bunch of text here but only because we're trying to spell things out a
 ### First, add this tool to your Bazel setup.
 
 #### If you have a MODULE.bazel file and are using the new [bzlmod](https://bazel.build/external/migration) system
+
 Copy this into your `MODULE.bazel`, making sure to update to the [latest commit](https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main) per the instructions below.
 
 ```Starlark
@@ -165,7 +261,6 @@ For now, we'd suggest continuing on to set up `clangd` (below). Thereafter, if y
 
 ## Editor Setup — for autocomplete based on `compile_commands.json`
 
-
 ### VSCode
 
 Let's get `clangd`'s extension installed and configured.
@@ -176,24 +271,29 @@ code --install-extension llvm-vs-code-extensions.vscode-clangd
 code --uninstall-extension ms-vscode.cpptools
 ```
 
-Then, open VSCode *user* settings, so things will be automatically set up for all projects you open.
+Then, open VSCode _user_ settings, so things will be automatically set up for all projects you open.
 
 Search for "clangd".
 
 Add the following three separate entries to `"clangd.arguments"`:
+
 ```Shell
 --header-insertion=never
 --compile-commands-dir=${workspaceFolder}/
 --query-driver=**
 ```
+
 (Just copy each as written; VSCode will correctly expand `${workspaceFolder}` for each workspace.)
-  -  They get rid of (overzealous) header insertion; locate the compile commands correctly, even when browsing system headers outside the source tree; and cause `clangd` to interrogate Bazel's compiler wrappers to figure out which system headers are included by default.
-  -  If your Bazel `WORKSPACE` is a subdirectory of your project, change `--compile-commands-dir` to point into that subdirectory by overriding the flags in your *workspace* settings. You'll need to re-specify all the flags when you override, because the workspace settings replace all the flags in the user settings.
+
+- They get rid of (overzealous) header insertion; locate the compile commands correctly, even when browsing system headers outside the source tree; and cause `clangd` to interrogate Bazel's compiler wrappers to figure out which system headers are included by default.
+- If your Bazel `WORKSPACE` is a subdirectory of your project, change `--compile-commands-dir` to point into that subdirectory by overriding the flags in your _workspace_ settings. You'll need to re-specify all the flags when you override, because the workspace settings replace all the flags in the user settings.
 
 <!-- At least until https://github.com/clangd/vscode-clangd/issues/138 is resolved. -->
+
 Turn on: Clangd: Check Updates
-  -  You always want the latest! New great features and fixes are always getting added to clangd.
-  -  We'll assume you always have the latest and aren't using an old version nor Apple's `clangd` intended for Xcode. While we can and do make great efforts to workaround issues in the current version of `clangd`, we remove those workarounds when `clangd` fixes them upstream. This keeps the code simple and development velocity fast!
+
+- You always want the latest! New great features and fixes are always getting added to clangd.
+- We'll assume you always have the latest and aren't using an old version nor Apple's `clangd` intended for Xcode. While we can and do make great efforts to workaround issues in the current version of `clangd`, we remove those workarounds when `clangd` fixes them upstream. This keeps the code simple and development velocity fast!
 
 If turning on automatic updates doesn't prompt you to download the actual `clangd` server binary, hit (CMD/CTRL+SHIFT+P)->Download language Server.
 
@@ -201,7 +301,7 @@ You may need to subsequently reload VSCode [(CMD/CTRL+SHIFT+P)->reload] for the 
 
 #### If you work on your repository with others...
 
-... and would like these settings to be automatically applied for your teammates, also add the settings to the VSCode *workspace* settings and then check `.vscode/settings.json` into source control.
+... and would like these settings to be automatically applied for your teammates, also add the settings to the VSCode _workspace_ settings and then check `.vscode/settings.json` into source control.
 
 ### Other Editors
 
@@ -223,7 +323,7 @@ We use this tool every day to develop a cross-platform library for iOS and Andro
 
 All the usual clangd features should work. CMD/CTRL+click navigation (or option if you've changed keybindings), smart rename, autocomplete, highlighting etc. Everything you expect in an IDE should be there (because most good IDEs are backed by `clangd`). As a general principle: If you're choosing tooling that needs to understand a programming language, you want it to be based on a compiler frontend for that language, which clangd does as part of the LLVM/clang project.
 
-Everything should also work for generated files, though you may have to run a build for the generated file to exist. If you're using this with remote execution or cache, you'll likely have to use `--remote_download_regex` to pull down the header and source files and to avoid errors in-editor, now that build without the bytes (`--remote_download_toplevel`) is the Bazel default. If you work through this, we'd love it if you'd give back and file a PR adding good instructions for everyone else --or at least share what you've learned in an issue. You'll also want to pull down *.d dependency files on non-Windows; they let us find headers much faster when they're available as a cache. We'd appreciate if you'd also check to make sure that they're pulled down even without (`--noexperimental_inmemory_dotd_files`). Thanks for helping!
+Everything should also work for generated files, though you may have to run a build for the generated file to exist. If you're using this with remote execution or cache, you'll likely have to use `--remote_download_regex` to pull down the header and source files and to avoid errors in-editor, now that build without the bytes (`--remote_download_toplevel`) is the Bazel default. If you work through this, we'd love it if you'd give back and file a PR adding good instructions for everyone else --or at least share what you've learned in an issue. You'll also want to pull down \*.d dependency files on non-Windows; they let us find headers much faster when they're available as a cache. We'd appreciate if you'd also check to make sure that they're pulled down even without (`--noexperimental_inmemory_dotd_files`). Thanks for helping!
 
 ## Rough Edges
 
@@ -243,7 +343,8 @@ If you're using Bazel for the C language family, you'll likely also want some of
 2. A way to use std::filesystem across platforms: [hedronvision/bazel-cc-filesystem-backport](https://github.com/hedronvision/bazel-cc-filesystem-backport)
 
 ---
-*Looking for implementation details instead? Want to dive into the codebase?*
+
+_Looking for implementation details instead? Want to dive into the codebase?_
 See [ImplementationReadme.md](./ImplementationReadme.md).
 
-*Bazel/Blaze maintainer reading this?* If you'd be interested in integrating this into official Bazel tools, let us know in an issue or email, and let's talk! We love getting to use Bazel and would love to help.
+_Bazel/Blaze maintainer reading this?_ If you'd be interested in integrating this into official Bazel tools, let us know in an issue or email, and let's talk! We love getting to use Bazel and would love to help.
