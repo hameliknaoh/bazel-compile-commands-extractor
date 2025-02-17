@@ -161,6 +161,9 @@ In that case, you can easily specify the top-level, output targets you're workin
 Open a `BUILD` file—we'd recommend using (or creating) `//BUILD`—and add something like:
 
 ```Starlark
+
+# BUILD
+
 load("@hedron_compile_commands//:refresh_compile_commands.bzl", "refresh_compile_commands")
 
 refresh_compile_commands(
