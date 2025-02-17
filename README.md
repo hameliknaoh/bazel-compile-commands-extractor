@@ -3,13 +3,8 @@
 
 - [Compile Commands Extractor for Bazel](#compile-commands-extractor-for-bazel)
   - [Quick Example](#quick-example)
-  - [Status](#status)
-    - [Outside Testimonials](#outside-testimonials)
   - [Usage](#usage)
     - [First, add this tool to your Bazel setup.](#first-add-this-tool-to-your-bazel-setup)
-      - [If you have a MODULE.bazel file and are using the new bzlmod system](#if-you-have-a-modulebazel-file-and-are-using-the-new-bzlmod-system)
-      - [If you're using the traditional WORKSPACE system](#if-youre-using-the-traditional-workspace-system)
-      - [Either way: Get Updates via Renovate](#either-way-get-updates-via-renovate)
     - [Second, get the extractor running.](#second-get-the-extractor-running)
       - [There are four common paths:](#there-are-four-common-paths)
         - [1. Have a relatively simple codebase, where every target builds without needing any additional configuration or flags beyond what's in .bazelrc?](#1-have-a-relatively-simple-codebase-where-every-target-builds-without-needing-any-additional-configuration-or-flags-beyond-whats-in-bazelrc)
@@ -109,26 +104,6 @@ INFO: Running command line: bazel-bin/refresh_compile_commands
 -rw-rw-r-- 1 test test 7719283 Feb 14 19:50 compile_commands.json
 ```
 
-## Status
-
-Pretty great with only very minor rough edges. We use this every day and love it.
-
-If there haven't been commits in a while, it's because of stability, not neglect. This is in daily use inside Hedron.
-
-For everyday use, we'd recommend using this rather than the platform-specific IDE adapters (like Tulsi or the ASwB/CLion plugin to the extent it works), except the times when you need some platform-editor-specific feature (e.g. Apple's NextStep Interface Builder) that's not ever going to be supported in a cross-platform editor.
-
-### Outside Testimonials
-
-There are lots of people using this tool. That includes large companies and projects with tricky stacks, like in robotics.
-
-We're including a couple of things they've said. We hope they'll give you enough confidence to give this tool a try, too!
-
-> "Thanks for an awesome tool! Super easy to set up and use."
-> — a robotics engineer at Boston Dynamics
-
-> "Thank you for showing so much rigor in what would otherwise be just some uninteresting tooling project. This definitely feels like a passing the baton/torch moment. My best wishes for everything you do in life."
-> — author of the previous best tool of this type
-
 ## Usage
 
 > Basic Setup Time: 10m
@@ -139,59 +114,19 @@ There's a bunch of text here but only because we're trying to spell things out a
 
 ### First, add this tool to your Bazel setup.
 
-#### If you have a MODULE.bazel file and are using the new [bzlmod](https://bazel.build/external/migration) system
+Copy this into your `MODULE.bazel`:
 
-Copy this into your `MODULE.bazel`, making sure to update to the [latest commit](https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main) per the instructions below.
+```starlark
+# MODULE.bazel
 
-```Starlark
-# Hedron's Compile Commands Extractor for Bazel
-# https://github.com/hedronvision/bazel-compile-commands-extractor
-bazel_dep(name = "hedron_compile_commands", dev_dependency = True)
+bazel_dep(name = "hedron_compile_commands", version="0.1")
+
 git_override(
     module_name = "hedron_compile_commands",
-    remote = "https://github.com/hedronvision/bazel-compile-commands-extractor.git",
-    commit = "0e990032f3c5a866e72615cf67e5ce22186dcb97",
-    # Replace the commit hash (above) with the latest (https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main).
-    # Even better, set up Renovate and let it do the work for you (see "Suggestion: Updates" in the README).
+    remote = "https://github.com/hameliknaoh/bazel-compile-commands-extractor.git",
+    branch = "main",
 )
 ```
-
-#### If you're using the traditional WORKSPACE system
-
-Copy this into the top of your Bazel `WORKSPACE` file, making sure to update to the [latest commit](https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main) per the instructions below. Putting it at the top will prevent other tools from clobbering any of its dependencies with old versions; we promise to keep ours dependency versions up-to-date.
-
-```Starlark
-load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-
-# Hedron's Compile Commands Extractor for Bazel
-# https://github.com/hedronvision/bazel-compile-commands-extractor
-http_archive(
-    name = "hedron_compile_commands",
-
-    # Replace the commit hash (0e990032f3c5a866e72615cf67e5ce22186dcb97) in both places (below) with the latest (https://github.com/hedronvision/bazel-compile-commands-extractor/commits/main), rather than using the stale one here.
-    # Even better, set up Renovate and let it do the work for you (see "Suggestion: Updates" in the README).
-    url = "https://github.com/hedronvision/bazel-compile-commands-extractor/archive/0e990032f3c5a866e72615cf67e5ce22186dcb97.tar.gz",
-    strip_prefix = "bazel-compile-commands-extractor-0e990032f3c5a866e72615cf67e5ce22186dcb97",
-    # When you first run this tool, it'll recommend a sha256 hash to put here with a message like: "DEBUG: Rule 'hedron_compile_commands' indicated that a canonical reproducible form can be obtained by modifying arguments sha256 = ..."
-)
-load("@hedron_compile_commands//:workspace_setup.bzl", "hedron_compile_commands_setup")
-hedron_compile_commands_setup()
-load("@hedron_compile_commands//:workspace_setup_transitive.bzl", "hedron_compile_commands_setup_transitive")
-hedron_compile_commands_setup_transitive()
-load("@hedron_compile_commands//:workspace_setup_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive")
-hedron_compile_commands_setup_transitive_transitive()
-load("@hedron_compile_commands//:workspace_setup_transitive_transitive_transitive.bzl", "hedron_compile_commands_setup_transitive_transitive_transitive")
-hedron_compile_commands_setup_transitive_transitive_transitive()
-```
-
-#### Either way: Get Updates via Renovate
-
-Improvements come frequently, so we'd recommend keeping up-to-date.
-
-We'd strongly recommend you set up [Renovate](https://github.com/renovatebot/renovate) (or similar) at some point to keep this dependency (and others) up-to-date by default. [We aren't affiliated with Renovate or anything, but we think it's awesome. It watches for new versions and sends you PRs for review or automated testing. It's free and easy to set up. It's been astoundingly useful in our codebase, and we've worked with the wonderful maintainer to make things great for Bazel use. And it's used in official Bazel repositories.] Here's a [Renovate configuration example from one of our projects](https://github.com/hedronvision/bazel-cc-filesystem-backport/blob/main/renovate.json5), in the hope that it might save you time.
-
-If not now, maybe come back to this step later, or watch this repo for updates. [Or hey, maybe give us a quick star, while you're thinking about watching.] Like Abseil, we live at head; the latest commit to the main branch is the commit you want. So don't rely on release notifications; use [Renovate](https://github.com/renovatebot/renovate) or poll manually for new commits.
 
 ### Second, get the extractor running.
 
